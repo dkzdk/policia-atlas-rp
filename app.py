@@ -1,103 +1,70 @@
-from flask import Flask, render_template, request, redirect, session
+from flask import Flask, render_template, jsonify
 import sqlite3
+import os
 
 app = Flask(__name__)
-app.secret_key = "SEGREDO_RP_123"
 
 # =========================
-# CONEXÃO BANCO
+# BANCO DE DADOS (SQLite)
 # =========================
-def db():
-    conn = sqlite3.connect("policia.db")
+DB_PATH = "policia.db"
+
+def conectar():
+    conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
-# =========================
-# LOGIN SIMPLES POLICIAL
-# =========================
-POLICIA_LOGIN = {
-    "admin": "1234",
-    "comandante": "senha123"
-}
-
-@app.route("/", methods=["GET", "POST"])
-def login():
-
-    if request.method == "POST":
-        user = request.form["user"]
-        senha = request.form["senha"]
-
-        if user in POLICIA_LOGIN and POLICIA_LOGIN[user] == senha:
-            session["user"] = user
-            return redirect("/painel")
-
-        return "❌ Login inválido"
-
-    return render_template("login.html")
 
 # =========================
-# PAINEL ADMIN
+# HOME
 # =========================
-@app.route("/painel")
-def painel():
+@app.route("/")
+def home():
+    return """
+    <h1>🚔 Sistema Polícia RP ATLAS</h1>
+    <p>Status: ONLINE ✅</p>
+    <p>API: /api/status</p>
+    """
 
-    if "user" not in session:
-        return redirect("/")
-
-    conn = db()
-    c = conn.cursor()
-
-    c.execute("SELECT * FROM carteira ORDER BY data DESC")
-    carteiras = c.fetchall()
-
-    return render_template("painel.html", user=session["user"], carteiras=carteiras)
 
 # =========================
-# BUSCAR CARTEIRA
+# STATUS API (para bot/site)
 # =========================
-@app.route("/buscar", methods=["GET", "POST"])
-def buscar():
+@app.route("/api/status")
+def status():
+    return jsonify({
+        "status": "online",
+        "sistema": "Polícia RP ATLAS",
+        "versao": "1.0"
+    })
 
-    resultado = None
-
-    if request.method == "POST":
-        cid = request.form["id"]
-
-        conn = db()
-        c = conn.cursor()
-
-        c.execute("SELECT * FROM carteira WHERE id=?", (cid,))
-        resultado = c.fetchone()
-
-    return render_template("buscar.html", resultado=resultado)
 
 # =========================
-# VER CARTEIRA
+# CARTEIRA (BASE FUTURA QR)
 # =========================
-@app.route("/carteira/<id>")
-def carteira(id):
+@app.route("/carteira/<user_id>")
+def carteira(user_id):
+    conn = conectar()
+    cursor = conn.cursor()
 
-    conn = db()
-    c = conn.cursor()
+    cursor.execute("SELECT * FROM carteira_policial WHERE user_id = ?", (user_id,))
+    dados = cursor.fetchone()
 
-    c.execute("SELECT * FROM carteira WHERE id=?", (id,))
-    data = c.fetchone()
+    if not dados:
+        return "<h2>❌ Carteira não encontrada</h2>"
 
-    if not data:
-        return "Carteira inválida"
+    return f"""
+    <h1>🪪 Carteira Policial</h1>
+    <p><b>ID:</b> {dados['user_id']}</p>
+    <p><b>Patente:</b> {dados['patente']}</p>
+    <p><b>Status:</b> {'Ativo' if dados['ativo'] == 1 else 'Inativo'}</p>
+    <p><b>Registro:</b> {dados['registro']}</p>
+    """
 
-    return render_template("carteira.html", data=data)
-
-# =========================
-# LOGOUT
-# =========================
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect("/")
 
 # =========================
-# RUN
+# RODAR LOCAL / RENDER
 # =========================
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
