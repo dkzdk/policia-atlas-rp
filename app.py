@@ -1,24 +1,51 @@
-from flask import Flask, render_template, request, redirect, session
-import psycopg2
+from flask import Flask
+import sqlite3
 import os
 
 app = Flask(__name__)
-app.secret_key = "ATLAS_SECRET"
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
+DB_PATH = "policia.db"
 
 # =========================
-# CONEXÃO POSTGRES
+# AUTO SETUP BANCO
 # =========================
-def db():
-    return psycopg2.connect(DATABASE_URL)
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS carteira (
+        id TEXT PRIMARY KEY,
+        user_id INTEGER,
+        patente TEXT,
+        ativo INTEGER,
+        criado_em TEXT
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS set_pedido (
+        id TEXT PRIMARY KEY,
+        user_id INTEGER,
+        nome_cidade TEXT,
+        status TEXT,
+        recrutor_id INTEGER,
+        criado_em TEXT
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+# roda automaticamente ao iniciar
+init_db()
 
 # =========================
 # HOME
 # =========================
 @app.route("/")
 def home():
-    return "🏛️ ATLAS RP - Governo Online"
+    return "🏛️ ATLAS RP - Sistema Online"
 
 # =========================
 # CARTEIRA PÚBLICA
@@ -26,49 +53,26 @@ def home():
 @app.route("/carteira/<cid>")
 def carteira(cid):
 
-    conn = db()
+    conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
-    cur.execute("SELECT * FROM carteira WHERE id=%s", (cid,))
+    cur.execute("SELECT * FROM carteira WHERE id=?", (cid,))
     data = cur.fetchone()
 
     conn.close()
 
     if not data:
-        return render_template("carteira.html", erro=True)
+        return "<h1>❌ Carteira não encontrada</h1>", 404
 
-    return render_template("carteira.html", data=data)
-
-# =========================
-# LOGIN
-# =========================
-@app.route("/login", methods=["GET","POST"])
-def login():
-
-    if request.method == "POST":
-        session["user"] = request.form["user"]
-        return redirect("/painel")
-
-    return render_template("login.html")
+    return f"""
+    <h1>🪪 CARTEIRA POLICIAL</h1>
+    <p>ID: {data[0]}</p>
+    <p>Patente: {data[2]}</p>
+    <p>Status: {"ATIVO" if data[3] else "INATIVO"}</p>
+    """
 
 # =========================
-# PAINEL POLICIAL
+# RUN
 # =========================
-@app.route("/painel")
-def painel():
-
-    if "user" not in session:
-        return redirect("/login")
-
-    return render_template("painel.html")
-
-# =========================
-# ADMIN GOVERNO
-# =========================
-@app.route("/admin")
-def admin():
-
-    return render_template("admin.html")
-
 if __name__ == "__main__":
-    app.run()
+    app.run(host="0.0.0.0", port=5000)
