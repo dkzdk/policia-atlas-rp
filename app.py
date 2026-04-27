@@ -1,95 +1,62 @@
-from flask import Flask
+from flask import Flask, render_template, request, redirect
 import sqlite3
-import os
 
 app = Flask(__name__)
 
-DB_PATH = "policia.db"
+DB = "policia.db"
 
-# =========================
-# CONEXÃO SEGURA
-# =========================
-def conectar():
-    conn = sqlite3.connect(DB_PATH)
-    return conn
+def db():
+    return sqlite3.connect(DB)
 
 # =========================
 # HOME
 # =========================
 @app.route("/")
 def home():
-    return "🚔 ATLAS RP - Sistema Online Funcionando"
+    return "🏛️ ATLAS RP - Sistema Governo Online"
 
 # =========================
-# CARTEIRA (VERIFICAÇÃO PÚBLICA)
+# VER CARTEIRA
 # =========================
 @app.route("/carteira/<cid>")
 def carteira(cid):
 
-    try:
-        conn = conectar()
-        cur = conn.cursor()
+    conn = db()
+    cur = conn.cursor()
 
-        cur.execute("""
-            SELECT id, user_id, patente, ativo, criado_em
-            FROM carteira
-            WHERE id=?
-        """, (cid,))
+    cur.execute("SELECT * FROM carteira WHERE id=?", (cid,))
+    data = cur.fetchone()
 
-        data = cur.fetchone()
-        conn.close()
+    conn.close()
 
-        # ❌ não achou
-        if not data:
-            return """
-            <h1 style='color:red;text-align:center'>❌ CARTEIRA NÃO ENCONTRADA</h1>
-            <p style='text-align:center'>ID inválido ou removido</p>
-            """, 404
+    if not data:
+        return render_template("carteira.html", erro=True)
 
-        # 🔥 carteira válida
-        return f"""
-        <html>
-        <head>
-            <title>ATLAS RP - Carteira</title>
-        </head>
-
-        <body style="background:#0f0f0f;color:white;font-family:Arial;text-align:center;padding-top:50px;">
-
-            <div style="background:#1c1c1c;padding:20px;border-radius:10px;display:inline-block;">
-
-                <h1>🪪 CARTEIRA POLICIAL</h1>
-
-                <hr>
-
-                <p><b>ID:</b> {data[0]}</p>
-                <p><b>USER ID:</b> {data[1]}</p>
-                <p><b>PATENTE:</b> {data[2]}</p>
-
-                <p>
-                    <b>STATUS:</b> 
-                    {"🟢 ATIVO" if data[3] else "🔴 INATIVO"}
-                </p>
-
-                <p><b>CRIADO EM:</b> {data[4]}</p>
-
-                <br>
-                <small>ATLAS RP - Sistema Oficial de Verificação</small>
-
-            </div>
-
-        </body>
-        </html>
-        """
-
-    except Exception as e:
-        return f"""
-        <h1>❌ ERRO NO SERVIDOR</h1>
-        <p>{str(e)}</p>
-        """, 500
-
+    return render_template("carteira.html",
+        id=data[0],
+        user=data[1],
+        patente=data[2],
+        ativo=data[3],
+        criado=data[4]
+    )
 
 # =========================
-# RUN LOCAL (Render ignora isso)
+# LOGIN POLICIAL (BÁSICO)
 # =========================
+@app.route("/login", methods=["GET", "POST"])
+def login():
+
+    if request.method == "POST":
+        return redirect("/painel")
+
+    return render_template("login.html")
+
+# =========================
+# PAINEL GOVERNO
+# =========================
+@app.route("/painel")
+def painel():
+    return render_template("painel.html")
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run()
