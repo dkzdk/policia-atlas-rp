@@ -1,22 +1,27 @@
-from flask import Flask, render_template, request, redirect
-import sqlite3
+from flask import Flask, render_template, request, redirect, session
+import psycopg2
+import os
 
 app = Flask(__name__)
+app.secret_key = "ATLAS_SECRET"
 
-DB = "policia.db"
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
+# =========================
+# CONEXÃO POSTGRES
+# =========================
 def db():
-    return sqlite3.connect(DB)
+    return psycopg2.connect(DATABASE_URL)
 
 # =========================
 # HOME
 # =========================
 @app.route("/")
 def home():
-    return "🏛️ ATLAS RP - Sistema Governo Online"
+    return "🏛️ ATLAS RP - Governo Online"
 
 # =========================
-# VER CARTEIRA
+# CARTEIRA PÚBLICA
 # =========================
 @app.route("/carteira/<cid>")
 def carteira(cid):
@@ -24,7 +29,7 @@ def carteira(cid):
     conn = db()
     cur = conn.cursor()
 
-    cur.execute("SELECT * FROM carteira WHERE id=?", (cid,))
+    cur.execute("SELECT * FROM carteira WHERE id=%s", (cid,))
     data = cur.fetchone()
 
     conn.close()
@@ -32,31 +37,38 @@ def carteira(cid):
     if not data:
         return render_template("carteira.html", erro=True)
 
-    return render_template("carteira.html",
-        id=data[0],
-        user=data[1],
-        patente=data[2],
-        ativo=data[3],
-        criado=data[4]
-    )
+    return render_template("carteira.html", data=data)
 
 # =========================
-# LOGIN POLICIAL (BÁSICO)
+# LOGIN
 # =========================
-@app.route("/login", methods=["GET", "POST"])
+@app.route("/login", methods=["GET","POST"])
 def login():
 
     if request.method == "POST":
+        session["user"] = request.form["user"]
         return redirect("/painel")
 
     return render_template("login.html")
 
 # =========================
-# PAINEL GOVERNO
+# PAINEL POLICIAL
 # =========================
 @app.route("/painel")
 def painel():
+
+    if "user" not in session:
+        return redirect("/login")
+
     return render_template("painel.html")
+
+# =========================
+# ADMIN GOVERNO
+# =========================
+@app.route("/admin")
+def admin():
+
+    return render_template("admin.html")
 
 if __name__ == "__main__":
     app.run()
