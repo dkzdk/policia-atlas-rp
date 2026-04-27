@@ -4,7 +4,7 @@ import os
 
 app = Flask(__name__)
 
-DB_PATH = "policia.db"
+DB_PATH = "/tmp/policia.db"
 
 # =========================
 # CONEXÃO SEGURA
