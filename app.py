@@ -1,38 +1,84 @@
-from flask import Flask, render_template
+from flask import Flask
 import sqlite3
+import os
 
 app = Flask(__name__)
 
-DB = "policia.db"
+DB_PATH = "policia.db"
 
+# =========================
+# CONEXÃO SEGURA
+# =========================
 def db():
-    return sqlite3.connect(DB)
+    conn = sqlite3.connect(DB_PATH)
+    return conn
 
+# =========================
+# HOME
+# =========================
+@app.route("/")
+def home():
+    return "🏛️ ATLAS RP ONLINE"
+
+# =========================
+# CARTEIRA
+# =========================
 @app.route("/carteira/<cid>")
 def carteira(cid):
 
-    conn = db()
-    cur = conn.cursor()
+    try:
+        conn = db()
+        cur = conn.cursor()
 
-    cur.execute("SELECT id, user_id, patente, ativo, criado_em FROM carteira WHERE id=?", (cid,))
-    data = cur.fetchone()
+        cur.execute("SELECT * FROM carteira WHERE id=?", (cid,))
+        data = cur.fetchone()
 
-    conn.close()
+        conn.close()
 
-    if not data:
-        return render_template("carteira.html", erro=True)
+        if not data:
+            return "<h1>❌ Carteira não encontrada</h1>", 404
 
-    # foto simulada (você pode trocar depois por upload real)
-    foto_url = f"https://api.dicebear.com/7.x/bottts/png?seed={data[1]}"
+        return f"""
+        <html>
+        <head>
+            <title>Carteira ATLAS RP</title>
+            <style>
+                body {{
+                    background:#0b0b0b;
+                    color:white;
+                    font-family:Arial;
+                    text-align:center;
+                }}
+                .card {{
+                    margin-top:80px;
+                    display:inline-block;
+                    padding:20px;
+                    background:#1c1c1c;
+                    border-radius:12px;
+                }}
+            </style>
+        </head>
+        <body>
 
-    return render_template("carteira.html",
-        id=data[0],
-        user=data[1],
-        patente=data[2],
-        ativo=data[3],
-        criado=data[4],
-        foto=foto_url
-    )
+        <div class="card">
+            <h1>🪪 CARTEIRA POLICIAL</h1>
+            <p><b>ID:</b> {data[0]}</p>
+            <p><b>User:</b> {data[1]}</p>
+            <p><b>Patente:</b> {data[2]}</p>
+            <p><b>Status:</b> {"🟢 ATIVO" if data[3] else "🔴 INATIVO"}</p>
+            <p><b>Data:</b> {data[4]}</p>
+        </div>
 
+        </body>
+        </html>
+        """
+
+    except Exception as e:
+        return f"<h1>❌ ERRO INTERNO</h1><p>{e}</p>", 500
+
+# =========================
+# RUN (IMPORTANTE NO RENDER)
+# =========================
 if __name__ == "__main__":
-    app.run()
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
